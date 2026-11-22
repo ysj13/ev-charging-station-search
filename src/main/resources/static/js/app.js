@@ -31,7 +31,7 @@
   const MOBILE_QUERY = '(max-width: 760px)';
   const SHEET_ORDER = ['peek', 'half', 'full']; // 모바일 목록 시트: 접힘 → 절반 → 펼침
   const SHEET_LABELS = { peek: '목록 펼치기 (접힘)', half: '목록 크게 보기 (절반)', full: '목록 접기 (펼침)' };
-  const SHEET_PEEK_BASE = 142; // CSS의 --sheet-peek-base와 같게
+  const SHEET_PEEK_BASE = 158; // CSS의 --sheet-peek-base와 같게
   const SWIPE_START_PX = 6; // 이보다 적게 움직이면 미는 것이 아니라 누른 것으로 본다
   const SWIPE_CLICK_GUARD_MS = 400; // 밀고 난 직후의 클릭(터치의 tap 판정 포함)은 카드를 열지 않는다
 
