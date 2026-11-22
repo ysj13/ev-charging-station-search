@@ -28,6 +28,9 @@
   const MAX_CARDS = 5; // 닫을 때까지 남는 알림 카드
   const MAX_PLAIN_TOASTS = 3; // 잠시 뜨는 안내
   const SWIPE_DISMISS_PX = 80; // 이만큼 옆으로 밀면 알림을 닫는다
+  const MOBILE_QUERY = '(max-width: 760px)';
+  const SHEET_ORDER = ['peek', 'half', 'full']; // 모바일 목록 시트: 접힘 → 절반 → 펼침
+  const SHEET_LABELS = { peek: '목록 펼치기', half: '목록 크게 보기', full: '목록 줄이기' };
   const SWIPE_START_PX = 6; // 이보다 적게 움직이면 미는 것이 아니라 누른 것으로 본다
   const SWIPE_CLICK_GUARD_MS = 400; // 밀고 난 직후의 클릭(터치의 tap 판정 포함)은 카드를 열지 않는다
 
@@ -39,7 +42,11 @@
     return node;
   };
 
+  const isMobile = () => window.matchMedia(MOBILE_QUERY).matches;
+
   const state = {
+    sheetRest: 'half', // 상세·알림함을 닫으면 돌아갈 시트 높이
+    sheetOverlay: false, // 상세·알림함 때문에 시트를 펼쳐 둔 상태인지
     map: null,
     mode: 'area', // 'area' | 'keyword'
     keyword: '',
@@ -188,8 +195,9 @@
     const live = [...$('toasts').children].filter((n) => !n.dataset.leaving);
     const cards = live.filter((n) => n.dataset.sticky === 'true');
     const plain = live.filter((n) => n.dataset.sticky !== 'true');
-    cards.slice(MAX_CARDS).forEach((n) => n.remove());
-    plain.slice(MAX_PLAIN_TOASTS).forEach((n) => n.remove());
+    const mobile = isMobile(); // 좁은 화면에서는 지도를 덜 가리도록 적게 쌓는다
+    cards.slice(mobile ? 1 : MAX_CARDS).forEach((n) => n.remove());
+    plain.slice(mobile ? 1 : MAX_PLAIN_TOASTS).forEach((n) => n.remove());
   }
 
   function dismissToast(node, direction = 1) {
@@ -474,6 +482,7 @@
 
   function renderDetail(detail, flashChargerId) {
     if (!$('inbox').hidden) closeInbox({ restoreFocus: false, cancelPending: false });
+    expandSheetForOverlay();
     state.detail = detail;
     renderSubscribeButton();
     $('detail-test').hidden = !state.devTools;
@@ -532,6 +541,7 @@
     state.focusChargerId = null;
     document.querySelectorAll('.list__item[aria-current]').forEach((n) => n.removeAttribute('aria-current'));
     renderMarkers();
+    restoreSheetAfterOverlay();
     // 상세를 열었던 곳(목록 항목이나 지도 핀)으로 포커스를 돌려준다
     // 그 사이 결과에서 빠졌으면 목록 첫 항목이나 검색창으로 보낸다
     if (restoreFocus && wasOpen && closedId && state.returnFocusTo === 'inbox') {
@@ -648,6 +658,7 @@
     $('inbox').hidden = false;
     $('list').inert = true;
     document.querySelector('.panel__header').inert = true;
+    expandSheetForOverlay();
     state.unread = 0;
     renderUnread();
     renderInbox();
@@ -677,6 +688,7 @@
     $('inbox').hidden = true;
     $('list').inert = false;
     document.querySelector('.panel__header').inert = false;
+    restoreSheetAfterOverlay();
     if (restoreFocus) $('inbox-open').focus();
   }
 
@@ -908,17 +920,102 @@
     $('map-message').textContent = message;
   }
 
+  // ---------- 모바일 목록 시트 ----------
+
+  function setSheet(next, { rest = true } = {}) {
+    const app = document.querySelector('.app');
+    if (rest) state.sheetRest = next;
+    $('sheet-handle').setAttribute('aria-label', SHEET_LABELS[next]);
+    if (app.dataset.sheet === next) return;
+    app.dataset.sheet = next;
+  }
+
+  /** 상세·알림함을 열면 내용이 잘 보이게 시트를 펼친다. 닫으면 원래 높이로 돌아간다 */
+  function expandSheetForOverlay() {
+    if (!isMobile()) return;
+    state.sheetOverlay = true;
+    setSheet('full', { rest: false });
+  }
+
+  function restoreSheetAfterOverlay() {
+    // 상세를 닫으며 곧바로 알림함을 여는 경우처럼, 이어서 다른 덮개가 열리면 펼친 채로 둔다
+    setTimeout(() => {
+      if (!state.sheetOverlay || !$('detail').hidden || !$('inbox').hidden) return;
+      state.sheetOverlay = false;
+      setSheet(state.sheetRest, { rest: false });
+    }, 0);
+  }
+
+  /** 시트 높이가 바뀌면 지도 크기를 다시 계산한다 (지도 영역 검색도 새 크기로 다시 됨) */
+  function relayoutMap() {
+    if (state.map) state.map.relayout();
+  }
+
+  /** 손잡이를 누르면 한 단계씩 바꾸고, 끌면 손을 뗀 위치에서 가장 가까운 높이에 붙는다 */
+  function bindSheetHandle() {
+    const panel = $('panel');
+    const handle = $('sheet-handle');
+    let startY = null;
+    let startHeight = 0;
+    let moved = false;
+    handle.addEventListener('pointerdown', (e) => {
+      if (!isMobile()) return;
+      startY = e.clientY;
+      startHeight = panel.getBoundingClientRect().height;
+      moved = false;
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (startY === null) return;
+      const dy = e.clientY - startY;
+      if (!moved && Math.abs(dy) < 6) return;
+      moved = true;
+      panel.classList.add('is-dragging');
+      const appHeight = document.querySelector('.app').getBoundingClientRect().height;
+      panel.style.height = `${Math.min(appHeight * 0.92, Math.max(120, startHeight - dy))}px`;
+    });
+    const end = () => {
+      if (startY === null) return;
+      startY = null;
+      if (!moved) return; // 누르기만 한 경우는 click에서 처리
+      const height = panel.getBoundingClientRect().height;
+      const appHeight = document.querySelector('.app').getBoundingClientRect().height;
+      const peek = parseFloat(getComputedStyle(document.querySelector('.app')).getPropertyValue('--sheet-peek').replace(/[^0-9.]/g, ' ').trim().split(' ')[0]) || 142;
+      const targets = { peek, half: appHeight * 0.52, full: appHeight * 0.88 };
+      const nearest = Object.entries(targets).sort((a, b) => Math.abs(a[1] - height) - Math.abs(b[1] - height))[0][0];
+      panel.classList.remove('is-dragging');
+      panel.style.height = '';
+      state.sheetOverlay = false;
+      setSheet(nearest);
+      handle.dataset.dragged = 'true'; // 끌고 난 뒤 따라오는 click은 무시
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+    handle.addEventListener('click', () => {
+      if (handle.dataset.dragged) { delete handle.dataset.dragged; return; }
+      const current = document.querySelector('.app').dataset.sheet;
+      const next = current === 'full' ? 'half' : SHEET_ORDER[SHEET_ORDER.indexOf(current) + 1];
+      state.sheetOverlay = false;
+      setSheet(next);
+    });
+    // 높이 변화가 끝나면(애니메이션 포함) 지도 크기를 다시 맞춘다
+    panel.addEventListener('transitionend', (e) => { if (e.propertyName === 'height') relayoutMap(); });
+    window.matchMedia(MOBILE_QUERY).addEventListener('change', () => setTimeout(relayoutMap, 50));
+  }
+
   function initMap() {
     state.map = new kakao.maps.Map($('map'), {
       center: new kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng),
       level: 4,
     });
-    state.map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+    // 휴대폰은 두 손가락으로 확대하므로 확대 버튼을 두지 않는다 (핀을 가리지 않게)
+    if (!isMobile()) state.map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
     kakao.maps.event.addListener(state.map, 'idle', onMapIdle);
     if ('geolocation' in navigator) $('locate').hidden = false;
   }
 
   function bindUi() {
+    bindSheetHandle();
     $('search-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const keyword = $('keyword').value.trim();
@@ -929,6 +1026,7 @@
       $('back-to-area').hidden = false;
       setNotice('');
       if (state.selectedId) closeDetail({ restoreFocus: false }); // 사용자가 입력 중인 검색창에서 포커스를 빼앗지 않음
+      if (isMobile() && document.querySelector('.app').dataset.sheet === 'peek') setSheet('half'); // 결과가 보이게
       search({ fit: true });
     });
     $('back-to-area').addEventListener('click', () => backToArea());

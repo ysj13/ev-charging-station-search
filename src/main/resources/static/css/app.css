@@ -245,11 +245,60 @@ html, body {
 }
 
 /* ---------- 모바일: 지도 위, 패널 아래 ---------- */
+/* 데스크톱에서는 손잡이를 숨긴다 */
+.sheet-handle { display: none; }
+
+/* ---------- 모바일: 지도 위, 목록은 아래에서 끌어 올리는 시트(접힘·절반·펼침) ---------- */
 @media (max-width: 760px) {
   .app { flex-direction: column-reverse; }
-  .panel { width: 100%; height: 50%; border-right: 0; border-top: 1px solid var(--border); }
-  .map-area { height: 50%; flex: none; }
-  .legend { left: 8px; bottom: 8px; }
-  .locate { right: 8px; bottom: 8px; }
-  .toasts { top: 8px; right: 8px; }
+  .map-area { flex: 1; min-height: 0; }
+  .app { --sheet-peek: calc(142px + env(safe-area-inset-bottom, 0px)); }
+  .app[data-sheet="peek"] .panel { height: var(--sheet-peek); }
+  .app[data-sheet="half"] .panel { height: 52%; }
+  .app[data-sheet="full"] .panel { height: 88%; }
+  .panel {
+    width: 100%; flex: none; border-right: 0; border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px rgba(16, 24, 32, 0.12);
+    transition: height 0.25s ease; padding-bottom: env(safe-area-inset-bottom, 0px); overflow: hidden;
+  }
+  .panel.is-dragging { transition: none; }
+  .sheet-handle {
+    display: flex; justify-content: center; align-items: center; flex: none; width: 100%; height: 28px;
+    border: 0; background: none; cursor: grab; touch-action: none; position: relative; z-index: 3; padding: 0;
+  }
+  .sheet-handle__bar { width: 40px; height: 5px; border-radius: 999px; background: var(--border); }
+  .sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+  /* 상세·알림함은 손잡이 아래부터 덮어, 손잡이로 시트 높이를 계속 바꿀 수 있게 한다 */
+  .detail { top: 28px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+  .panel__header { padding: 2px 16px 12px; gap: 8px; }
+  .brand h1 { font-size: 17px; }
+  .summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 손가락으로 누르기 쉽게: 누를 수 있는 것은 높이 44px 이상 */
+  .button, .select, .search__input, .chip { min-height: 44px; }
+  .button--small { min-height: 40px; }
+  .link-button { min-height: 44px; display: inline-flex; align-items: center; }
+  .inbox__main { min-height: 44px; }
+  /* iOS는 16px보다 작은 입력창을 누르면 화면을 확대하므로 16px로 */
+  .search__input, .select { font-size: 16px; }
+
+  .legend { left: max(8px, env(safe-area-inset-left, 0px)); bottom: 8px; font-size: 11px; padding: 4px 8px; gap: 8px; }
+  .locate { right: max(8px, env(safe-area-inset-right, 0px)); bottom: 8px; min-height: 40px; }
+  /* 목록을 펼치면 지도는 좁은 띠만 남으므로 범례와 내 위치 버튼을 숨긴다 */
+  .app[data-sheet="full"] .legend, .app[data-sheet="full"] .locate { display: none; }
+
+  /* 알림은 화면 위쪽 전체 폭으로. 노치·상태 표시줄을 피한다 */
+  .toasts {
+    top: max(8px, env(safe-area-inset-top, 0px)); left: max(8px, env(safe-area-inset-left, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px)); width: auto;
+  }
+  /* 펼친 목록의 위쪽(닫기 버튼)을 가리지 않도록 한 줄짜리 카드 하나만 보인다. 지난 알림은 "내 알림"에 남는다 */
+  .toast--notify { padding: 10px 48px 10px 14px; border-radius: 12px; }
+  .toast .toast__open { font-size: 15px; }
+  .toast__hint { display: none; }
+  .toast .toast__close { top: 6px; right: 6px; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .panel { transition: none; }
 }
