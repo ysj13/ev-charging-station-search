@@ -1,0 +1,41 @@
+{
+  "items": {
+    "item": [
+      {
+        "busiId": "ME",
+        "statId": "ME174027",
+        "chgerId": "01",
+        "stat": "2",
+        "statUpdDt": "20261121235042",
+        "lastTsdt": "20261121085825",
+        "lastTedt": "20261121093923",
+        "nowTsdt": ""
+      },
+      {
+        "busiId": "ME",
+        "statId": "ME178009",
+        "chgerId": "01",
+        "stat": "3",
+        "statUpdDt": "20261121235053",
+        "lastTsdt": "20261121230317",
+        "lastTedt": "20261121231332",
+        "nowTsdt": "20261121232551"
+      },
+      {
+        "busiId": "ME",
+        "statId": "ME178009",
+        "chgerId": "02",
+        "stat": "9",
+        "statUpdDt": "20261121235310",
+        "lastTsdt": "20261121225758",
+        "lastTedt": "20261121231847",
+        "nowTsdt": ""
+      }
+    ]
+  },
+  "resultCode": "00",
+  "resultMsg": "NORMAL SERVICE.",
+  "totalCount": 473,
+  "pageNo": 1,
+  "numOfRows": 3
+}
