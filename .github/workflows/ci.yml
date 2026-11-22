@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 같은 브랜치에 새 커밋이 오면 이전 실행은 취소한다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 빌드와 테스트
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Gradle 배포판과 의존성 캐시
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 통합 테스트는 Testcontainers로 PostgreSQL·Redis·Kafka·RabbitMQ를 띄운다 (러너에 Docker가 있음)
+      # 공공데이터 API는 테스트에서 가짜 응답을 쓰므로 인증키가 필요 없다
+      - name: 테스트
+        run: ./gradlew test
+
+      - name: 테스트 리포트 올리기 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: |
+            build/reports/tests/test
+            build/test-results/test
+          retention-days: 7
