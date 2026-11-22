@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 같은 PR에 새 커밋이 오면 이전 실행은 취소한다. main push는 커밋마다 따로 돌려 결과를 남긴다
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-{0}', github.ref) || format('ci-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 빌드와 테스트
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Gradle 배포판과 의존성 캐시 (v5: MIT 라이선스. v6부터 캐시 기능이 별도 상용 약관을 따른다)
+      - uses: gradle/actions/setup-gradle@v5
+
+      # 통합 테스트는 Testcontainers로 PostgreSQL·Redis·Kafka·RabbitMQ를 띄운다 (러너에 Docker가 있음)
+      # 공공데이터 API는 테스트에서 가짜 응답을 쓰므로 인증키가 필요 없다
+      - name: 테스트
+        run: ./gradlew test
+        # 단계 시간 초과는 실패로 처리되어, 멈췄을 때도 아래 리포트가 올라간다
+        timeout-minutes: 35
+
+      # 테스트 단계의 시간 초과도 실패로 처리되므로 failure()로 충분하다 (새 커밋으로 취소된 실행은 올리지 않음)
+      - name: 테스트 리포트 올리기 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: |
+            build/reports/tests/test
+            build/test-results/test
+          retention-days: 7

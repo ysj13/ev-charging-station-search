@@ -1,5 +1,7 @@
 # EV 충전기 빈자리 감지 (ev-charging-station-search)
 
+[![CI](https://github.com/ysj13/ev-charging-station-search/actions/workflows/ci.yml/badge.svg)](https://github.com/ysj13/ev-charging-station-search/actions/workflows/ci.yml)
+
 전기차 충전소를 검색하고, 충전기가 **충전중에서 충전대기로 바뀌는 순간(빈자리)** 을 감지해 이벤트로 발행하고, 그 충전소를 구독한 사용자에게 알림을 보내는 백엔드 서비스입니다.
 공공데이터포털의 [한국환경공단_전기자동차 충전소 정보](https://www.data.go.kr/data/15076352/openapi.do)를 사용합니다.
 
@@ -162,6 +164,8 @@ Testcontainers가 테스트용 컨테이너를 따로 띄웁니다. 테스트는
 | 전 구간 시나리오 | 3 | 전체 동기화 → 상태 수집 → 빈자리 감지 → 검색 반영, 반복 수집 시 한 번만 감지, 상태 주입 경로 |
 
 공공 API만 가짜 응답으로 바꾸고 PostgreSQL, Redis, Kafka, RabbitMQ는 실제 컨테이너로 검증합니다. 공공 API 응답 형식은 실제 응답을 저장한 샘플로 확인합니다.
+
+main 브랜치 push와 PR마다 GitHub Actions에서 전체 테스트를 실행합니다(`.github/workflows/ci.yml`).
 
 ## 프로젝트 구조
 
