@@ -1,0 +1,148 @@
+server:
+  port: 8280 # 8080은 Windows(Hyper-V) 예약 포트 범위(8004~8203)와 겹쳐 사용 불가
+
+spring:
+  servlet:
+    encoding:
+      # 정적 화면(HTML·JS)에도 Content-Type에 UTF-8을 명시한다 (한글 문자열 포함)
+      charset: UTF-8
+      force: true
+  application:
+    name: ev-charging-station-search
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # 정적 화면(HTML·JS·CSS)은 매번 서버에 바뀌었는지 확인한다(안 바뀌었으면 304).
+          # 지정하지 않으면 브라우저가 임의로 캐시를 재사용해, 배포 뒤에도 이전 화면 코드가 돌 수 있다
+          no-cache: true
+  config:
+    # 프로젝트 루트의 .env(인증키 등)를 프로퍼티로 읽는다. 없어도 기동은 된다.
+    import: optional:file:.env[.properties]
+
+  task:
+    scheduling:
+      pool:
+        # 충전소 전체 동기화가 도는 동안에도 상태 수집이 멈추지 않도록 2개 이상
+        size: 2
+
+  docker:
+    compose:
+      # bootRun 시 compose.yaml의 컨테이너를 자동으로 띄우고, 종료 시에도 계속 실행해 둔다
+      lifecycle-management: start-only
+
+  datasource:
+    url: jdbc:postgresql://localhost:15432/evcharger
+    username: evcharger
+    password: evcharger
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate # 스키마는 Flyway가 관리하고, 엔티티와 불일치하면 기동 실패
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: ev-charging-station-search
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # 역직렬화 실패 시 예외 대신 null 값으로 넘겨, 깨진 메시지 하나가 파티션 전체를 막지 않게 한다
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.evalarm.charger.common.messaging
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: evcharger
+    password: evcharger
+    # 발송 작업을 브로커가 받았는지 확인한 뒤에 QUEUED로 기록한다
+    publisher-confirm-type: simple
+    listener:
+      simple:
+        # 발송 실패 시 1초, 2초 뒤 다시 시도해 모두 3번 시도하고, 끝내 실패하면 다시 넣지 않고 DLX → DLQ로 보낸다
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 2 # 첫 시도를 뺀 재시도 횟수 (Boot 4에서 max-attempts를 대체)
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 4s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+
+app:
+  public-api:
+    base-url: https://apis.data.go.kr/B552584/EvCharger
+    service-key: ${DATA_GO_KR_SERVICE_KEY:}
+    zcode: ${COLLECT_ZCODE:11}
+    connect-timeout: 5s
+    # 본문 수신까지 포함한 전체 시간 상한. 평소 8MB 페이지는 1~2초면 받지만, 느린 날에도 끊기지 않도록 여유를 둔다
+    read-timeout: 60s
+    retry-backoff: 2s
+  collector:
+    enabled: ${COLLECTOR_ENABLED:true}
+    station-sync-cron: "0 0 4 * * *" # 매일 04시(한국 시간) 충전소 정보 전체 동기화
+    status-interval: PT2M            # 2분. 하루 약 720회 호출
+    status-period-minutes: 5         # 수집 간격(2분)보다 길게 잡아 누락 방지. 중복은 변경 감지 단계에서 거른다
+    # 연속 실패 후 복구 시 마지막 성공 시점부터 다시 조회. API는 period를 11 이상 줘도 약 10분까지만 돌려준다
+    # 이보다 길게 밀리면 전체 동기화(SNAPSHOT 발행)로 따라잡는다
+    status-max-period-minutes: 10
+    max-stale-ratio: 0.05            # 한 번의 동기화로 지울 수 있는 충전기는 기존의 5%까지
+    page-size: 9999
+  web:
+    kakao-map-js-key: ${KAKAO_MAP_JS_KEY:}
+    max-stream-connections: 500
+    stream-timeout: PT30M
+  notification:
+    enabled: ${NOTIFICATION_ENABLED:true}
+    # 시연용으로 넣은 상태(MANUAL)의 빈자리도 알림을 보낼지. 개발 도구를 켠 환경에서만 true
+    include-manual-events: ${app.dev-tools.enabled:false}
+    max-subscriptions-per-client: 20
+    inbox-size: 20
+    publish-confirm-timeout: PT5S
+  dev-tools:
+    # 상태 변경 주입기(/dev/**). 인증이 없는 쓰기 엔드포인트라 기본은 끄고, 로컬에서만 .env로 켠다
+    enabled: ${DEV_TOOLS_ENABLED:false}
+  detector:
+    enabled: ${DETECTOR_ENABLED:true}
+    concurrency: 3 # charger.status 파티션 수와 같게
+    # 이보다 오래된 빈자리는 상태만 반영하고 이벤트는 발행하지 않는다.
+    # 첫 배포 시 토픽에 남은 과거 기록(보존 기간 7일)이나 장애 뒤 밀린 메시지를 읽을 때 지난 알림이 쏟아지는 것을 막는다
+    max-event-age: PT15M
+  kafka:
+    topics:
+      charger-status:
+        name: charger.status
+        partitions: 3
+        replicas: 1
+      charger-available:
+        name: charger.available
+        partitions: 3
+        replicas: 1
+  rabbit:
+    exchange: notification.exchange
+    routing-key: notification.send
+    queue: notification.send.queue
+    dead-letter-exchange: notification.dlx
+    dead-letter-queue: notification.send.dlq
