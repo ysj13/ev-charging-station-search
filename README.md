@@ -165,7 +165,7 @@ Testcontainers가 테스트용 컨테이너를 따로 띄웁니다. 테스트는
 
 공공 API만 가짜 응답으로 바꾸고 PostgreSQL, Redis, Kafka, RabbitMQ는 실제 컨테이너로 검증합니다. 공공 API 응답 형식은 실제 응답을 저장한 샘플로 확인합니다.
 
-push와 PR마다 GitHub Actions에서 전체 테스트를 실행합니다(`.github/workflows/ci.yml`).
+main 브랜치 push와 PR마다 GitHub Actions에서 전체 테스트를 실행합니다(`.github/workflows/ci.yml`).
 
 ## 프로젝트 구조
 

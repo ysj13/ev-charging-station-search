@@ -10,6 +10,7 @@ import com.evalarm.charger.TestcontainersConfig;
 import com.evalarm.charger.collector.ChargerRow;
 import com.evalarm.charger.collector.StationUpsertRepository;
 import com.evalarm.charger.common.config.AppProperties;
+import com.evalarm.charger.common.messaging.ChargerAvailableEvent;
 import com.evalarm.charger.common.messaging.ChargerStatusMessage;
 import com.evalarm.charger.common.messaging.StatusSource;
 import com.evalarm.charger.station.domain.ChargerKey;
@@ -151,7 +152,13 @@ class AvailabilityDetectorIntegrationTest {
         send(ChargerStatus.AVAILABLE, longAgo);
 
         awaitDbStatus("AVAILABLE");
-        assertTrue(consumeAvailable(1, 5_000).isEmpty());
+        // 같은 충전기로 새 빈자리를 하나 더 만든다. 이것만 받았다면 앞의 오래된 빈자리는 발행되지 않은 것이다
+        // (빈 결과만 확인하면, 느린 환경에서 구독이 늦어 아무것도 못 받아도 통과해 버린다)
+        send(ChargerStatus.CHARGING, t0.plusSeconds(60));
+        send(ChargerStatus.AVAILABLE, t0.plusSeconds(120));
+        List<String> events = consumeSettled();
+        assertEquals(1, events.size());
+        assertTrue(events.getFirst().contains(ChargerAvailableEvent.eventIdOf(stationId, "01", t0.plusSeconds(120))));
     }
 
     @Test
@@ -167,7 +174,7 @@ class AvailabilityDetectorIntegrationTest {
         send(ChargerStatus.AVAILABLE, t0.plusSeconds(60));
 
         awaitDbStatus("AVAILABLE"); // 재시도로 결국 반영됨
-        assertEquals(1, consumeAvailable(2, 5_000).size());
+        assertEquals(1, consumeSettled().size());
         assertEquals(new ChargerState(ChargerStatus.AVAILABLE, t0.plusSeconds(60)), redisState());
         // 실제로 재처리 경로를 탔고, 그때 같은 이벤트를 다시 발행하지 않았음을 확인한다
         assertEquals(suppressedBefore + 1, meterRegistry.counter("detector.vacancy.duplicates.suppressed").count());
@@ -209,7 +216,7 @@ class AvailabilityDetectorIntegrationTest {
         send(ChargerStatus.AVAILABLE, t0.plusSeconds(60), StatusSource.SNAPSHOT); // 중복
         send(ChargerStatus.CHARGING, t0.plusSeconds(30), StatusSource.SNAPSHOT); // 늦게 온 오래된 상태
 
-        List<String> events = consumeAvailable(2, 8_000);
+        List<String> events = consumeSettled();
 
         assertEquals(1, events.size());
         awaitDbStatus("AVAILABLE");
@@ -301,7 +308,19 @@ class AvailabilityDetectorIntegrationTest {
         return consumeAvailable(expected, 20_000);
     }
 
+    /**
+     * "정확히 몇 건"을 확인할 때 쓴다. 첫 이벤트를 넉넉히(20초) 기다린 뒤, 같은 컨슈머로 2초 더 읽어 추가 이벤트가 없는지 본다.
+     * 구독 준비가 느린 환경에서도 첫 이벤트를 놓치지 않고, 중복 발행은 그대로 잡아낸다
+     */
+    private List<String> consumeSettled() {
+        return consume(1, 20_000, 2_000);
+    }
+
     private List<String> consumeAvailable(int expected, long waitMillis) {
+        return consume(expected, waitMillis, 0);
+    }
+
+    private List<String> consume(int expected, long waitMillis, long settleMillis) {
         Map<String, Object> config = new HashMap<>(kafkaAdmin.getConfigurationProperties());
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "detector-test-" + UUID.randomUUID());
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -311,13 +330,21 @@ class AvailabilityDetectorIntegrationTest {
             List<String> result = new ArrayList<>();
             long deadline = System.currentTimeMillis() + waitMillis;
             while (System.currentTimeMillis() < deadline && result.size() < expected) {
-                for (ConsumerRecord<String, String> record : consumer.poll(Duration.ofMillis(500))) {
-                    if (stationId.equals(record.key())) {
-                        result.add(record.value());
-                    }
-                }
+                pollInto(consumer, result);
+            }
+            long settleUntil = System.currentTimeMillis() + settleMillis;
+            while (!result.isEmpty() && System.currentTimeMillis() < settleUntil) {
+                pollInto(consumer, result);
             }
             return result;
+        }
+    }
+
+    private void pollInto(KafkaConsumer<String, String> consumer, List<String> result) {
+        for (ConsumerRecord<String, String> record : consumer.poll(Duration.ofMillis(500))) {
+            if (stationId.equals(record.key())) {
+                result.add(record.value());
+            }
         }
     }
 
