@@ -2,14 +2,17 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>EV 충전 빈자리</title>
   <meta name="description" content="지도에서 전기차 충전소의 빈 충전기를 실시간으로 찾습니다.">
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<div class="app">
-  <aside class="panel" aria-label="검색과 결과">
+<div class="app" data-sheet="half">
+  <aside class="panel" id="panel" aria-label="검색과 결과">
+    <button class="sheet-handle" id="sheet-handle" type="button" aria-label="목록 크게 보기 (절반)" aria-keyshortcuts="ArrowUp ArrowDown Home End">
+      <span class="sheet-handle__bar" aria-hidden="true"></span>
+    </button>
     <header class="panel__header">
       <div class="brand">
         <h1>EV 충전 빈자리</h1>
