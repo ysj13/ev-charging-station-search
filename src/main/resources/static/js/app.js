@@ -134,6 +134,22 @@
     return 'off';
   }
 
+  /** 목록 배지: 몇 대를 바로 쓸 수 있는지. 전체 대수는 아래 줄에 따로 보인다 */
+  function availabilityBadge(station, kind) {
+    if (kind === 'available') return `${station.availableCount}대 가능`;
+    return kind === 'busy' ? '모두 사용 중' : '사용 불가';
+  }
+
+  // 공공데이터 상태 이름(충전대기·충전중 등)을 사용자가 바로 알아듣는 말로. 서버 값은 코드표 그대로 둔다
+  const CHARGER_STATUS_LABELS = {
+    AVAILABLE: '사용 가능',
+    CHARGING: '사용 중',
+    SUSPENDED: '운영중지',
+    MAINTENANCE: '점검중',
+    COMMUNICATION_ERROR: '상태 확인 불가',
+    UNKNOWN: '상태 확인 불가',
+  };
+
   function formatDistance(meters) {
     if (meters === null || meters === undefined) return null;
     return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
@@ -372,10 +388,11 @@
       const top = el('div', 'list__top');
       top.append(el('span', 'list__name', station.name));
       const kind = availabilityOf(station);
-      top.append(el('span', `badge badge--${kind}`, kind === 'off' ? '사용 불가' : `${station.availableCount}/${station.chargerCount}`));
+      top.append(el('span', `badge badge--${kind}`, availabilityBadge(station, kind)));
 
       const meta = [
         formatDistance(station.distanceMeters),
+        `${station.chargerCount}대`,
         station.maxOutputKw ? `최대 ${station.maxOutputKw}kW` : null,
         station.parkingFree === true ? '무료 주차' : null,
         station.operatorName,
@@ -506,7 +523,7 @@
     const info = $('detail-info');
     info.replaceChildren();
     const rows = [
-      ['사용 가능', `${detail.availableCount} / ${detail.chargers.length}대`],
+      ['사용 가능', `${detail.availableCount}대 (전체 ${detail.chargers.length}대)`],
       ['이용 시간', detail.useTime],
       ['주차', detail.parkingFree === true ? '무료' : detail.parkingFree === false ? '유료' : null],
       ['이용 제한', detail.limited ? (detail.limitDetail || '있음') : null],
@@ -531,7 +548,7 @@
       left.append(el('div', 'charger__sub', charger.outputKw ? `${charger.outputKw}kW` : '출력 정보 없음'));
       const statusClass = charger.status === 'AVAILABLE' || charger.status === 'CHARGING' ? charger.status : 'other';
       const right = el('div', `status status--${statusClass}`);
-      right.append(el('div', null, charger.statusDescription));
+      right.append(el('div', null, CHARGER_STATUS_LABELS[charger.status] ?? charger.statusDescription));
       right.append(el('div', 'charger__sub', relativeTime(charger.statusUpdatedAt)));
       item.append(left, right);
       list.append(item);
