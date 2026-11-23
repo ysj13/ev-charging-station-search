@@ -81,7 +81,6 @@
     subscriptionSeq: 0, // 늦게 도착한 구독 목록 응답이 최신 상태를 덮지 않게
     cardEventIds: [], // 구독 알림 카드를 띄운 빈자리 (같은 빈자리로 두 번 띄우지 않게)
     plainToasts: new Map(), // eventId -> 빈자리 일반 토스트 (구독 알림이 오면 카드로 바꾼다)
-    focusChargerId: null, // 알림으로 연 상세에서 강조할 충전기
     devTools: false, // 서버의 개발 도구가 켜져 있으면 테스트 버튼을 보여 준다
     testBusy: false,
   };
@@ -140,16 +139,6 @@
     return kind === 'busy' ? '모두 사용 중' : '사용 불가';
   }
 
-  // 공공데이터 상태 이름(충전대기·충전중 등)을 사용자가 바로 알아듣는 말로. 서버 값은 코드표 그대로 둔다
-  const CHARGER_STATUS_LABELS = {
-    AVAILABLE: '사용 가능',
-    CHARGING: '사용 중',
-    SUSPENDED: '운영중지',
-    MAINTENANCE: '점검중',
-    COMMUNICATION_ERROR: '상태 확인 불가',
-    UNKNOWN: '상태 확인 불가',
-  };
-
   function formatDistance(meters) {
     if (meters === null || meters === undefined) return null;
     return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
@@ -180,7 +169,7 @@
     if (notify && onOpen) {
       const open = el('button', 'toast__open');
       open.type = 'button';
-      open.append(el('span', 'toast__message', message), el('span', 'toast__hint', '눌러서 충전기 보기 · 옆으로 밀어서 닫기'));
+      open.append(el('span', 'toast__message', message), el('span', 'toast__hint', '눌러서 충전소 보기 · 옆으로 밀어서 닫기'));
       open.addEventListener('click', () => { onOpen(); dismissToast(node); });
       node.append(open);
     } else {
@@ -468,11 +457,10 @@
 
   // ---------- 상세 ----------
 
-  /** @param chargerId 알림으로 열었을 때 강조할 충전기 */
+  /** @param chargerId 알림으로 열었을 때 그 빈자리를 알린 충전기. 있으면 사용 가능 칸을 반짝인다 */
   async function selectStation(stationId, { pan, from, chargerId = null }) {
     state.selectedId = stationId;
     state.returnFocusTo = from;
-    state.focusChargerId = chargerId;
     document.querySelectorAll('.list__item').forEach((n) => {
       if (n.dataset.stationId === stationId) n.setAttribute('aria-current', 'true');
       else n.removeAttribute('aria-current');
@@ -498,7 +486,7 @@
         // 제목으로 포커스를 옮기면 기본으로 위로 스크롤되므로, 알림 받은 충전기로 스크롤하는 경우는 스크롤 없이 옮긴다
         $('detail-name').focus({ preventScroll: scrollToCharger });
       }
-      if (scrollToCharger) document.querySelector('.charger--focus')?.scrollIntoView({ block: 'nearest' });
+      if (scrollToCharger) $('detail-tallies').scrollIntoView({ block: 'nearest' });
     } catch (e) {
       if (seq !== state.detailSeq) return;
       toast(e.message, { error: true });
@@ -520,10 +508,32 @@
     $('detail-name').textContent = detail.name;
     $('detail-address').textContent = [detail.address, detail.locationDetail].filter(Boolean).join(' ');
 
+    // 충전기 번호별 목록 대신, 바로 쓸 수 있는 자리·쓰는 중인 자리·그 외를 숫자로 보여 준다
+    const tally = { available: 0, charging: 0, other: 0 };
+    for (const charger of detail.chargers) {
+      if (charger.status === 'AVAILABLE') tally.available += 1;
+      else if (charger.status === 'CHARGING') tally.charging += 1;
+      else tally.other += 1;
+    }
+    const tallies = $('detail-tallies');
+    tallies.replaceChildren();
+    for (const [kind, label, value, sub] of [
+      ['available', '사용 가능', tally.available, '바로 충전'],
+      ['busy', '사용 중', tally.charging, '충전 진행'],
+      ['off', '그 외', tally.other, '점검·통신·중지'],
+    ]) {
+      // 알림으로 연 상세나 빈자리가 막 생긴 상세는 사용 가능 칸을 잠깐 반짝인다
+      const flash = kind === 'available' && flashChargerId;
+      const tile = el('div', `tally tally--${kind}${flash ? ' tally--flash' : ''}`);
+      tile.append(el('span', 'tally__label', label), el('span', 'tally__value', String(value)), el('span', 'tally__sub', sub));
+      tallies.append(tile);
+    }
+
+    const maxKw = Math.max(0, ...detail.chargers.map((c) => c.outputKw || 0));
     const info = $('detail-info');
     info.replaceChildren();
     const rows = [
-      ['사용 가능', `${detail.availableCount}대 (전체 ${detail.chargers.length}대)`],
+      ['출력', maxKw ? `최대 ${maxKw}kW · 총 ${detail.chargers.length}대` : `총 ${detail.chargers.length}대`],
       ['이용 시간', detail.useTime],
       ['주차', detail.parkingFree === true ? '무료' : detail.parkingFree === false ? '유료' : null],
       ['이용 제한', detail.limited ? (detail.limitDetail || '있음') : null],
@@ -532,26 +542,6 @@
     for (const [label, value] of rows) {
       if (!value) continue;
       info.append(el('dt', null, label), el('dd', null, value));
-    }
-
-    const list = $('detail-chargers');
-    list.replaceChildren();
-    for (const charger of detail.chargers) {
-      const focused = charger.chargerId === state.focusChargerId;
-      const item = el('li', `charger${charger.chargerId === flashChargerId ? ' charger--flash' : ''}${focused ? ' charger--focus' : ''}`);
-      const left = el('div');
-      left.append(el('div', null, `${charger.chargerId}번`));
-      if (focused) {
-        item.setAttribute('aria-current', 'true');
-        left.append(el('div', 'charger__badge', '🔔 알림 받은 충전기'));
-      }
-      left.append(el('div', 'charger__sub', charger.outputKw ? `${charger.outputKw}kW` : '출력 정보 없음'));
-      const statusClass = charger.status === 'AVAILABLE' || charger.status === 'CHARGING' ? charger.status : 'other';
-      const right = el('div', `status status--${statusClass}`);
-      right.append(el('div', null, CHARGER_STATUS_LABELS[charger.status] ?? charger.statusDescription));
-      right.append(el('div', 'charger__sub', relativeTime(charger.statusUpdatedAt)));
-      item.append(left, right);
-      list.append(item);
     }
   }
 
@@ -564,7 +554,6 @@
     document.querySelector('.panel__header').inert = false;
     state.selectedId = null;
     state.detail = null;
-    state.focusChargerId = null;
     document.querySelectorAll('.list__item[aria-current]').forEach((n) => n.removeAttribute('aria-current'));
     renderMarkers();
     restoreSheetAfterOverlay();
