@@ -1,5 +1,5 @@
 /*
- * 밝은 글래스 테마: 연회색 바탕 위 아쿠아빛 유리 패널, 은색 크롬 버튼, 은은한 빛.
+ * 밝은 글래스 테마: 연회색 바탕 위 반투명 유리 패널, 은색 크롬 버튼. 색 번짐(글로우)은 새 빈자리 알림 때만 잠깐 쓴다.
  * 사용 가능은 아쿠아, 사용 중은 빨강, 그 외는 회색으로 화면 전체에서 같은 뜻으로 쓴다.
  */
 :root {
@@ -46,8 +46,8 @@ html, body {
 /* 유리 패널 뒤에 비칠 빛: 아쿠아와 하늘빛 번짐 */
 body {
   background:
-    radial-gradient(520px 420px at 8% 92%, rgba(63, 193, 181, 0.32), transparent 70%),
-    radial-gradient(460px 380px at 32% 6%, rgba(159, 184, 255, 0.3), transparent 70%),
+    radial-gradient(520px 420px at 8% 92%, rgba(63, 193, 181, 0.12), transparent 70%),
+    radial-gradient(460px 380px at 32% 6%, rgba(159, 184, 255, 0.12), transparent 70%),
     radial-gradient(380px 320px at 0% 40%, rgba(255, 255, 255, 0.9), transparent 70%),
     var(--bg);
 }
@@ -79,7 +79,7 @@ body {
 }
 .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--off-dot); }
 .live[data-state="open"] { background: var(--available-soft); border-color: var(--available-line); color: var(--available); }
-.live[data-state="open"]::before { background: var(--aqua); box-shadow: 0 0 10px var(--aqua); }
+.live[data-state="open"]::before { background: var(--aqua); }
 .live[data-state="closed"] { background: var(--busy-soft); border-color: var(--busy-line); color: var(--busy); }
 .live[data-state="closed"]::before { background: var(--busy-dot); }
 
@@ -101,7 +101,7 @@ body {
 .button:hover { background: linear-gradient(180deg, #ffffff, #eaeff2); }
 .button--primary {
   background: linear-gradient(180deg, #ffffff, #cdeeea); border-color: rgba(63, 193, 181, 0.75);
-  color: var(--available); font-weight: 700; box-shadow: 0 6px 18px rgba(63, 193, 181, 0.3), inset 0 1px 0 #ffffff;
+  color: var(--available); font-weight: 700; box-shadow: 0 4px 12px rgba(60, 90, 110, 0.1), inset 0 1px 0 #ffffff;
 }
 .button--primary:hover { background: linear-gradient(180deg, #ffffff, #bfe9e4); }
 .button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -119,7 +119,7 @@ body {
 .chip:has(input:checked) {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(206, 238, 235, 0.95));
   border-color: var(--available-line); color: var(--available); font-weight: 700;
-  box-shadow: 0 0 16px rgba(63, 193, 181, 0.3);
+  box-shadow: none;
 }
 .chip input { margin: 0; accent-color: var(--aqua); }
 .select {
@@ -145,7 +145,7 @@ body {
   outline: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.45));
 }
 .list__item:focus-visible { box-shadow: 0 0 0 2px var(--accent), var(--glass-edge); }
-.list__item[aria-current="true"] { border-color: var(--available-line); box-shadow: 0 0 0 1px var(--available-line), 0 0 22px rgba(63, 193, 181, 0.3), var(--glass-edge); }
+.list__item[aria-current="true"] { border-color: var(--available-line); box-shadow: 0 0 0 1px var(--available-line), var(--glass-edge); }
 .list__item--flash { animation: flash 1.6s ease-out; }
 .list__top { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
 .list__name { font-weight: 700; font-size: 15px; color: #141b24; }
@@ -156,14 +156,14 @@ body {
   flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid transparent;
   font-variant-numeric: tabular-nums;
 }
-.badge--available { background: var(--available-soft); border-color: var(--available-line); color: var(--available); box-shadow: 0 0 12px rgba(63, 193, 181, 0.3); }
+.badge--available { background: var(--available-soft); border-color: var(--available-line); color: var(--available); }
 .badge--busy { background: var(--busy-soft); border-color: var(--busy-line); color: var(--busy); }
 .badge--off { background: var(--off-soft); border-color: var(--off-line); color: var(--off); }
 
 /* ---------- 상세 ---------- */
 .detail {
   position: absolute; inset: 0; overflow-y: auto; padding: 18px 16px; display: grid; align-content: start; gap: 12px;
-  background: linear-gradient(160deg, rgba(248, 251, 252, 0.94), rgba(240, 245, 247, 0.9));
+  background: linear-gradient(160deg, #f8fbfc, #f0f5f7); /* 아래 목록이 비치지 않게 불투명 */
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
 .detail__name { font-size: 22px; margin: 2px 0 0; letter-spacing: -0.02em; color: #141b24; }
@@ -191,14 +191,14 @@ body {
 .tally__sub { font-size: 11px; }
 .tally--available {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(170, 232, 225, 0.35));
-  box-shadow: 0 8px 22px rgba(63, 193, 181, 0.28), inset 1px 1px 0 #ffffff, inset -1px -1px 0 rgba(63, 193, 181, 0.35);
+  box-shadow: 0 6px 18px rgba(60, 90, 110, 0.08), inset 1px 1px 0 #ffffff, inset -1px -1px 0 rgba(63, 193, 181, 0.35);
 }
 .tally--available .tally__label { color: #0f6b62; }
 .tally--available .tally__value { color: var(--available); }
 .tally--available .tally__sub { color: #3d6b66; }
 .tally--busy {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(250, 196, 198, 0.35));
-  box-shadow: 0 8px 22px rgba(229, 72, 77, 0.12), inset 1px 1px 0 #ffffff, inset -1px -1px 0 rgba(229, 72, 77, 0.3);
+  box-shadow: 0 6px 18px rgba(60, 90, 110, 0.08), inset 1px 1px 0 #ffffff, inset -1px -1px 0 rgba(229, 72, 77, 0.3);
 }
 .tally--busy .tally__label { color: var(--busy); }
 .tally--busy .tally__value { color: #9a1f1f; }
@@ -215,7 +215,7 @@ body {
 .subscribe { min-height: 48px; font-size: 15px; font-weight: 700; }
 .subscribe[aria-pressed="false"] {
   background: linear-gradient(180deg, #ffffff, #cdeeea); border-color: rgba(63, 193, 181, 0.75); color: var(--available);
-  box-shadow: 0 8px 22px rgba(63, 193, 181, 0.3), inset 0 1px 0 #ffffff;
+  box-shadow: 0 4px 12px rgba(60, 90, 110, 0.1), inset 0 1px 0 #ffffff;
 }
 .subscribe[aria-pressed="true"] { background: var(--available-soft); border-color: var(--available-line); color: var(--available); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8); }
 .subscribe[aria-disabled="true"] { opacity: 0.6; cursor: progress; }
@@ -257,8 +257,8 @@ body {
 }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot--available { background: var(--aqua); box-shadow: 0 0 8px var(--aqua); }
-.dot--busy { background: var(--busy-dot); box-shadow: 0 0 6px rgba(229, 72, 77, 0.6); }
+.dot--available { background: var(--aqua); }
+.dot--busy { background: var(--busy-dot); }
 .dot--off { background: var(--off-dot); }
 .locate {
   position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 3;
@@ -277,14 +277,14 @@ body {
   transform: translateY(-50%);
 }
 .pin::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--off-dot); flex-shrink: 0; }
-.pin--available { border-color: var(--aqua); color: var(--available); box-shadow: 0 4px 12px rgba(40, 70, 85, 0.18), 0 0 14px rgba(63, 193, 181, 0.45), inset 0 1px 0 #ffffff; }
-.pin--available::before { background: var(--aqua); box-shadow: 0 0 8px var(--aqua); }
-.pin--busy { border-color: var(--busy-line); color: var(--busy); box-shadow: 0 4px 12px rgba(40, 70, 85, 0.18), 0 0 12px rgba(229, 72, 77, 0.3), inset 0 1px 0 #ffffff; }
-.pin--busy::before { background: var(--busy-dot); box-shadow: 0 0 6px rgba(229, 72, 77, 0.7); }
+.pin--available { border-color: var(--aqua); color: var(--available); box-shadow: 0 4px 12px rgba(40, 70, 85, 0.18), inset 0 1px 0 #ffffff; }
+.pin--available::before { background: var(--aqua); }
+.pin--busy { border-color: var(--busy-line); color: var(--busy); box-shadow: 0 4px 12px rgba(40, 70, 85, 0.18), inset 0 1px 0 #ffffff; }
+.pin--busy::before { background: var(--busy-dot); }
 .pin--off { background: rgba(255, 255, 255, 0.7); }
 .pin--selected {
   z-index: 10; background: linear-gradient(180deg, #ffffff, #d6f1ef); border-width: 2px;
-  outline: 3px solid rgba(13, 122, 112, 0.35); box-shadow: 0 6px 18px rgba(40, 70, 85, 0.22), 0 0 26px rgba(63, 193, 181, 0.6);
+  outline: 3px solid rgba(13, 122, 112, 0.35); box-shadow: 0 6px 18px rgba(40, 70, 85, 0.22);
 }
 .pin:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .detail__name:focus { outline: none; }
@@ -305,7 +305,7 @@ body {
 .toast--notify {
   border-left: 6px solid var(--aqua); padding: 16px 56px 16px 18px;
   font-weight: 600; position: relative;
-  box-shadow: var(--shadow), 0 0 26px rgba(63, 193, 181, 0.35), var(--glass-edge);
+  box-shadow: var(--shadow), var(--glass-edge);
   /* 세로 스크롤은 브라우저에 맡기고 가로로 미는 동작만 받는다 */
   touch-action: pan-y; user-select: none; cursor: grab;
 }
