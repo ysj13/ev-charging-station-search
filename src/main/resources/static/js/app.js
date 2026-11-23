@@ -30,7 +30,9 @@
   const SWIPE_DISMISS_PX = 80; // 이만큼 옆으로 밀면 알림을 닫는다
   const MOBILE_QUERY = '(max-width: 760px)';
   const SHEET_ORDER = ['peek', 'half', 'full']; // 모바일 목록 시트: 접힘 → 절반 → 펼침
-  const SHEET_LABELS = { peek: '목록 펼치기 (접힘)', half: '목록 크게 보기 (절반)', full: '목록 접기 (펼침)' };
+  // 손잡이를 누를 때 다음 높이. 펼침에서는 맨 아래로 떨어지지 않게 절반으로 돌아간다 (접힘은 끌거나 방향키로)
+  const SHEET_TAP_NEXT = { peek: 'half', half: 'full', full: 'half' };
+  const SHEET_LABELS = { peek: '목록 펼치기 (접힘)', half: '목록 크게 보기 (절반)', full: '목록 줄이기 (펼침)' };
   const SHEET_PEEK_BASE = 158; // CSS의 --sheet-peek-base와 같게
   const SWIPE_START_PX = 6; // 이보다 적게 움직이면 미는 것이 아니라 누른 것으로 본다
   const SWIPE_CLICK_GUARD_MS = 400; // 밀고 난 직후의 클릭(터치의 tap 판정 포함)은 카드를 열지 않는다
@@ -980,7 +982,7 @@
     }).observe($('map'));
   }
 
-  /** 손잡이: 누르면 접힘 → 절반 → 펼침 → 접힘 순으로, 끌면 손을 뗀 위치에서 가장 가까운 높이에 붙는다. 방향키로도 바꾼다 */
+  /** 손잡이: 누르면 접힘 → 절반 → 펼침 → 절반 순으로, 끌면 손을 뗀 위치에서 가장 가까운 높이에 붙는다. 방향키로도 바꾼다 */
   function bindSheetHandle() {
     const panel = $('panel');
     const handle = $('sheet-handle');
@@ -1032,7 +1034,7 @@
       // 키보드로 누른 click은 detail이 0이라 막지 않는다
       if (e.detail !== 0 && Date.now() < suppressClickUntil) return;
       const current = document.querySelector('.app').dataset.sheet;
-      chooseSheet(SHEET_ORDER[(SHEET_ORDER.indexOf(current) + 1) % SHEET_ORDER.length]);
+      chooseSheet(SHEET_TAP_NEXT[current] ?? 'half');
     });
     handle.addEventListener('keydown', (e) => {
       const index = SHEET_ORDER.indexOf(document.querySelector('.app').dataset.sheet);
